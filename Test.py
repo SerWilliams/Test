@@ -1,37 +1,8 @@
-def __init__(self, capacity):
-    self.capacity = int(capacity)
-    self.box = 0
-
-    fd
-
-or
-
-or
-or
-
-
-f
-
-f
-
-
-
-
-
-
-
-or
-
-or
-
-
-
-
-    filter(
-            fh
-    ))
-
-
-    filter(hf
-           def
-        )
+try:
+    foo()
+except ZeroDivisionError :
+    print("ZeroDivisionError ")
+except ArithmeticError:
+    print("ArithmeticError")
+except AssertionError:
+    print("AssertionError")
