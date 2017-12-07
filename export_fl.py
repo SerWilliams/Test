@@ -101,8 +101,6 @@ StationID, TransactionID, TenderType, TenderTotal, TenderOperatorID, TenderStart
 from Tenders
 where TransactionID > '%s' order by  TransactionID desc;
 ''' % dt)
-
-
 sql_query(query_accept, 'CurrencyAccepted', 'D:\\FLreports\\json\\accept.json', (0,2,), (3,))
 sql_query(query_dispens, 'CurrencyDispensed', 'D:\\FLreports\\json\\dispens.json', (0,2,), (3,))
 sql_query(query_manager, 'CurrencyCashManagement', 'D:\\FLreports\\json\\manager.json', (0,3,5,), (7,))
@@ -111,6 +109,3 @@ sql_query(query_appmode, 'ApplicationMode', 'D:\\FLreports\\json\\appmode.json',
 sql_query(query_interven, 'Interventions', 'D:\\FLreports\\json\\interven.json', (0,7,), (4,5,))
 sql_query(query_itemex, 'ItemExceptions', 'D:\\FLreports\\json\\itemex.json', (0,), (7,), 4, 5)
 sql_query(query_tenders, 'Tenders', 'D:\\FLreports\\json\\tenders.json', (0,3,4,), (5,6,))
-
-
-
