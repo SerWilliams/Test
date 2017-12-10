@@ -1,21 +1,30 @@
 import pyodbc
+import logging
+import logging.config
 from datetime import datetime, timedelta
 from json import dumps, dump
 from sys import exit
 from zlib import compress
 from urllib.parse import urlencode
-# from urllib2 import Request, urlopen, HTTPError, URLError
+from urllib.request import Request, urlopen, HTTPError, URLError
 from socket import gethostname
+logging.config.fileConfig('log_conf.cfg')
+logger = logging.getLogger("export_fl")
+logger.info('='*60)
+logger.info('Запуск экспорта данных из БД FLReports.mdb')
 Config = {'id_oo': 0, 'code': gethostname()[1:7]}
-dt = datetime.strftime(datetime.now() - timedelta(days=18), "%Y-%m-%d")
+dt = datetime.strftime(datetime.now() - timedelta(days=20), "%Y-%m-%d")
+logger.info('ИД ГМ - %d, код ГМ - %s, дата начала %s', Config['id_oo'], Config['code'], dt)
 try:
     conn = pyodbc.connect('DRIVER={Microsoft Access Driver (*.mdb)};DBQ=D:\\FLReports.mdb')
+    logger.debug('Успешное подключение к БД')
 except pyodbc.Error as e:
-    print('Ошибка БД', e)
+    logger.error('Ошибка БД \n%s \nExit', e)
     exit()
 
 
 def sql_query(query, table, rpath, inti, stri, *floati):
+    logger.info('Выгрузка таблицы %s', table)
     cursor = conn.cursor()
     cursor.execute(query)
     columns = [i[0] for i in cursor.description]
@@ -33,32 +42,35 @@ def sql_query(query, table, rpath, inti, stri, *floati):
         rows.append(dict(zip(columns, stroka)))
     result = {table: {'columns': columns, 'rows': rows}}
     with open(rpath, 'w') as file:
-        dump(result, file, sort_keys=True, ensure_ascii=False)
+        logger.info('Запись в файл %s', rpath)
+        dump(result, file, indent=4, sort_keys=True, ensure_ascii=False)
     send_result({
         'id_oo': Config['id_oo'],
         'code': Config['code'],
         'method': 'gm_kso_flreports',
-        'data': compress(dumps(result))
+        'data': compress(dumps(result, sort_keys=True, ensure_ascii=False).encode('utf-8'))
     })
-
-
 
 
 def send_result(data):
     url_in = "http://10.5.4.61:875/api/in_data.php"
-    send_data = urlencode(data)
+    url_in = 'https://httpbin.org'
+    logger.info('Отправка данных на сервер %s', url_in)
+    send_data = urlencode(data).encode('utf-8')
     r = Request(url_in, send_data)
-    sendstatus = 0
-    while sendstatus == 0:
+    sendstatus = 1
+    while sendstatus <=3:
         try:
             urlopen(r)
-        except HTTPError:
-            sendstatus = 0
-        except URLError:
-            sendstatus = 0
+            logger.info('Отправка выполнена успешно')
+        except HTTPError as e:
+            logger.error('Ошибка подключения к серверу %s, попытка %d ~HTTPError~ %s', e.code, sendstatus, e.reason)
+            sendstatus += 1
+        except URLError as e:
+            logger.error('Ошибка подключения к серверу, попытка %d ~URLError~ %s', sendstatus, e.reason)
+            sendstatus += 1
         else:
-            sendstatus = 1
-
+            sendstatus = 4
 
 
 query_accept = ('''
@@ -101,11 +113,17 @@ StationID, TransactionID, TenderType, TenderTotal, TenderOperatorID, TenderStart
 from Tenders
 where TransactionID > '%s' order by  TransactionID desc;
 ''' % dt)
-sql_query(query_accept, 'CurrencyAccepted', 'D:\\FLreports\\json\\accept.json', (0,2,), (3,))
-sql_query(query_dispens, 'CurrencyDispensed', 'D:\\FLreports\\json\\dispens.json', (0,2,), (3,))
-sql_query(query_manager, 'CurrencyCashManagement', 'D:\\FLreports\\json\\manager.json', (0,3,5,), (7,))
-sql_query(query_deverr, 'DeviceErrors', 'D:\\FLreports\\json\\deverr.json', (0,), (3,))
-sql_query(query_appmode, 'ApplicationMode', 'D:\\FLreports\\json\\appmode.json', (0,), (6,))
-sql_query(query_interven, 'Interventions', 'D:\\FLreports\\json\\interven.json', (0,7,), (4,5,))
-sql_query(query_itemex, 'ItemExceptions', 'D:\\FLreports\\json\\itemex.json', (0,), (7,), 4, 5)
-sql_query(query_tenders, 'Tenders', 'D:\\FLreports\\json\\tenders.json', (0,3,4,), (5,6,))
+try:
+    sql_query(query_accept, 'CurrencyAccepted', 'D:\\FLreports\\json\\accept.json', (0,2,), (3,))
+    sql_query(query_dispens, 'CurrencyDispensed', 'D:\\FLreports\\json\\dispens.json', (0,2,), (3,))
+    sql_query(query_manager, 'CurrencyCashManagement', 'D:\\FLreports\\json\\manager.json', (0,3,5,), (7,))
+    sql_query(query_deverr, 'DeviceErrors', 'D:\\FLreports\\json\\deverr.json', (0,), (3,))
+    sql_query(query_appmode, 'ApplicationMode', 'D:\\FLreports\\json\\appmode.json', (0,), (6,))
+    sql_query(query_interven, 'Interventions', 'D:\\FLreports\\json\\interven.json', (0,7,), (4,5,))
+    sql_query(query_itemex, 'ItemExceptions', 'D:\\FLreports\\json\\itemex.json', (0,), (7,), 4, 5)
+    sql_query(query_tenders, 'Tenders', 'D:\\FLreports\\json\\tenders.json', (0,3,4,), (5,6,))
+except BaseException as e:
+    logger.error('Ошибка выполнения запроса \n%s \n', e)
+logger.info('Выгрузка завершена.')
+logging.shutdown()
+exit(1)
